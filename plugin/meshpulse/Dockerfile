@@ -1,33 +1,35 @@
-# Dockerfile for Canopy + Go Plugin
-# Build from repository root: docker build -f plugin/go/Dockerfile -t canopy-go .
+# Dockerfile for Canopy + MeshPulse Plugin
+# Build from repository root: docker build -f plugin/meshpulse/Dockerfile -t meshpulse .
 
 # Stage 1: Build Canopy
-FROM golang:1.25-alpine AS canopy-builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN go build -trimpath -ldflags="-s -w" -o /canopy ./cmd/main/...
+FROM golang:1.24-alpine AS canopy-builder
+RUN apk add --no-cache make bash nodejs npm
+WORKDIR /go/src/github.com/canopy-network/canopy
+COPY . /go/src/github.com/canopy-network/canopy
+RUN go build -a -o bin ./cmd/main/...
 
-# Stage 2: Build Go Plugin
-FROM golang:1.25-alpine AS plugin-builder
+# Stage 2: Build MeshPulse Plugin
+FROM golang:1.24-alpine AS plugin-builder
 WORKDIR /app
-COPY plugin/go/ ./
-RUN go build -o /plugin .
+COPY plugin/meshpulse/ ./
+RUN go build -o /meshpulse .
 
 # Stage 3: Runtime
-FROM alpine:latest
+FROM alpine:3.19
 WORKDIR /app
-RUN apk add --no-cache bash && mkdir -p /tmp/plugin /root/.canopy plugin/go
+RUN apk add --no-cache bash && mkdir -p /tmp/plugin /root/.canopy plugin/meshpulse
 
-COPY --from=canopy-builder /canopy .
-COPY --from=plugin-builder /plugin plugin/go/go-plugin
-COPY plugin/go/pluginctl.sh plugin/go/pluginctl.sh
-RUN chmod +x plugin/go/pluginctl.sh plugin/go/go-plugin
+COPY --from=canopy-builder /go/src/github.com/canopy-network/canopy/bin ./
+COPY --from=plugin-builder /meshpulse plugin/meshpulse/meshpulse
+COPY plugin/meshpulse/chain.json plugin/meshpulse/chain.json
+RUN chmod +x plugin/meshpulse/meshpulse
 
-# Set plugin type for Canopy to start
-RUN printf '{"plugin":"go"}\n' > /root/.canopy/config.json
+# Tell canopy to use the meshpulse plugin
+RUN printf '{"plugin":"meshpulse"}\n' > /root/.canopy/config.json
 
-# Default: run canopy (start plugin separately with: ./plugin)
-# Mount config at runtime: -v ~/.canopy:/root/.canopy
-CMD ["./canopy", "start"]
+COPY plugin/meshpulse/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8080 50000 50001 50002
+
+CMD ["/entrypoint.sh"]

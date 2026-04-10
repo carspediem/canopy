@@ -1,0 +1,17 @@
+services:
+  meshpulse:
+    container_name: meshpulse-demo
+    build:
+      context: ../..
+      dockerfile: plugin/meshpulse/Dockerfile
+    ports:
+      - "8080:8080"    # MeshPulse UI
+      - "50000:50000"  # Wallet
+      - "50001:50001"  # Explorer
+      - "50002:50002"  # RPC
+    volumes:
+      - meshpulse-data:/root/.canopy
+    restart: unless-stopped
+
+volumes:
+  meshpulse-data:
