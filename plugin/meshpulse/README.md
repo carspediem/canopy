@@ -37,55 +37,34 @@ main.go
 
 ### Frontend (single HTML file, no dependencies)
 
-- **Page 1 – Speed Test**: animated gauge + run test + submit to chain
-- **Page 2 – My Stats**: wallet lookup, balance, measurement count, rank tier
-- **Page 3 – Live Feed**: last 50 on-chain measurements, real-time
-- **Page 4 – Leaderboard**: top 20 contributors by measurement count
+- **Landing page**: hero section, feature pills, "Connect Wallet" button
+- **Wallet modal**: enter your Canopy address to connect (persisted in localStorage)
+- **Node Dashboard**: ACTIVE status with pulsing indicator, live uptime counter, $MESHP earned counter (auto-increments every 30s), real-time measurement feed, Claim Rewards button
+- **My Stats**: wallet lookup, balance, measurement count, rank tier
+- **Live Feed**: last 50 on-chain measurements
+- **Leaderboard**: top 20 contributors by measurement count
+
+### In-memory cache
+
+HTTP handlers read from an in-memory `globalCache` instead of calling `StateRead` directly. This is required by the Canopy FSM protocol — `StateRead`/`StateWrite` are only permitted inside `CheckTx`/`DeliverTx` callbacks. The cache is populated by `DeliverTx` handlers on every confirmed measurement.
 
 ---
 
 ## How to Run
 
-### Prerequisites
-
-- Go 1.21+
-- A running Canopy node (provides `plugin.sock`)
-
-### 1. Build and start Canopy
+### Docker (recommended)
 
 ```bash
 # From the canopy repo root:
-make build/canopy
-canopy start
+docker build -f plugin/meshpulse/Dockerfile -t meshpulse .
+docker run -p 8080:8080 meshpulse
 ```
 
-### 2. Run MeshPulse
+Open **http://localhost:8080**
 
-```bash
-cd plugin/meshpulse   # this directory
-go run .
-# or
-make build && ./meshpulse
-```
+### Live demo
 
-The plugin will:
-1. Wait for `plugin.sock` to appear (Canopy FSM must be running)
-2. Perform the handshake, registering `submit_measurement` and `claim_reward`
-3. Start the UI at **http://localhost:8080**
-
-### 3. Submit a measurement via CLI
-
-```bash
-canopy tx submit_measurement \
-  --address <your-address> \
-  --ping 12 \
-  --download 50000 \
-  --upload 20000 \
-  --isp "Comcast" \
-  --region "US-East"
-```
-
-Or use the browser UI — it builds the transaction payload and copies it to your clipboard.
+**http://204.168.151.179:8080**
 
 ---
 
@@ -101,14 +80,18 @@ Or use the browser UI — it builds the transaction payload and copies it to you
 meshpulse/
 ├── main.go                          # entry point
 ├── go.mod
+├── Dockerfile                       # multi-stage build (canopy + plugin + alpine)
+├── entrypoint.sh                    # starts canopy then plugin
+├── init.expect                      # non-interactive key gen during docker build
 ├── contract/
 │   ├── contract.go                  # ContractConfig + routing
-│   ├── plugin.go                    # FSM socket protocol (base template)
+│   ├── plugin.go                    # FSM socket protocol + StartUIServer call
 │   ├── meshpulse.pb.go              # protobuf types for custom messages
 │   ├── meshpulse_state.go           # on-chain state structs + key helpers
-│   ├── meshpulse_handlers.go        # CheckTx / DeliverTx implementations
-│   ├── meshpulse_server.go          # HTTP API server
-│   ├── meshpulse_ui.go              # embedded single-file HTML UI
+│   ├── meshpulse_handlers.go        # CheckTx / DeliverTx + cache population
+│   ├── meshpulse_cache.go           # in-memory cache (globalCache)
+│   ├── meshpulse_server.go          # HTTP API server (reads from cache)
+│   ├── meshpulse_ui.go              # embedded single-file HTML/JS UI
 │   ├── error.go                     # error definitions
 │   ├── account.pb.go                # Account / Pool protobuf types
 │   ├── tx.pb.go                     # Transaction / MessageSend types
