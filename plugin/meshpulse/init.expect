@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+# Pre-initialize canopy data directory (generates keys, genesis, etc.)
+set timeout 60
+spawn /app/bin start
+expect {
+    "Enter password for your new private key:" {
+        send "meshpulse\r"
+        exp_continue
+    }
+    "Enter nickname for your new private key:" {
+        send "meshpulse\r"
+        exp_continue
+    }
+    "Using identity:" {
+        # Node is fully initialized and starting — kill it now
+        after 1000
+        exec kill [exp_pid]
+        expect eof
+    }
+    timeout {
+        exec kill [exp_pid]
+        expect eof
+    }
+    eof {}
+}
+exit 0

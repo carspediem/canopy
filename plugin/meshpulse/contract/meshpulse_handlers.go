@@ -147,6 +147,9 @@ func (c *Contract) DeliverMessageSubmitMeasurement(msg *MessageSubmitMeasurement
 	if err != nil {
 		return &PluginDeliverResponse{Error: err}
 	}
+	// ── Update in-memory cache for UI server ─────────────────────────────────
+	globalCache.AddMeasurement(m, *stats)
+	globalCache.UpdateContributor(contrib)
 	return &PluginDeliverResponse{Error: writeResp.Error}
 }
 

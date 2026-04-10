@@ -64,6 +64,8 @@ func StartPlugin(c Config) {
 	if err := p.Handshake(); err != nil {
 		log.Fatal(err.Error())
 	}
+	// start the MeshPulse UI server on :8080
+	StartUIServer(p, c)
 	// exit
 	return
 }
