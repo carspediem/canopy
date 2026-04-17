@@ -944,9 +944,26 @@ async function runAutoMeasurement() {
   if (autoFeedItems.length > 10) autoFeedItems.pop();
   renderAutoFeed();
 
-  // Submit to backend in background (best-effort)
+  // Submit to backend in background (best-effort) — real on-chain tx via keystore key
   try {
-    await fetch(API + '/api/stats', {cache: 'no-store'});
+    const resp = await fetch(API + '/api/submit-measurement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ping,
+        download,
+        upload,
+        isp: 'Unknown ISP',
+        region: 'Unknown Region'
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.txHash) {
+      // Update the hash in the feed display with the real tx hash
+      item.hash = data.txHash.substring(0, 12) + '…';
+      renderAutoFeed();
+      console.log('[AutoMeasure] TX submitted:', data.txHash);
+    }
   } catch(_) {}
 }
 

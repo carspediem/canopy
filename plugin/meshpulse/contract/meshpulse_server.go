@@ -22,8 +22,10 @@ func StartUIServer(p *Plugin, cfg Config) {
 	mux.HandleFunc("/", s.serveUI)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/feed", s.handleFeed)
+	mux.HandleFunc("/api/measurements", s.handleFeed) // alias for /api/feed
 	mux.HandleFunc("/api/leaderboard", s.handleLeaderboard)
 	mux.HandleFunc("/api/contributor", s.handleContributor)
+	mux.HandleFunc("/api/submit-measurement", s.handleSubmitMeasurement)
 
 	log.Printf("🌐 MeshPulse UI → http://localhost:8080")
 	go func() {
@@ -135,4 +137,37 @@ func (s *meshpulseServer) handleContributor(w http.ResponseWriter, r *http.Reque
 		"totalMeasurements": c.TotalMeasurements,
 		"tokenBalance":      c.TokenBalance,
 	})
+}
+
+// handleSubmitMeasurement accepts a POST with speed-test results, signs a
+// submit_measurement transaction with the keystore key, and submits it on-chain.
+func (s *meshpulseServer) handleSubmitMeasurement(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeErr(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Ping     uint64 `json:"ping"`
+		Download uint64 `json:"download"`
+		Upload   uint64 `json:"upload"`
+		ISP      string `json:"isp"`
+		Region   string `json:"region"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	txHash, err := SubmitMeasurementTx(req.Ping, req.Download, req.Upload, req.ISP, req.Region)
+	if err != nil {
+		log.Printf("SubmitMeasurementTx error: %v", err)
+		writeErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"txHash": txHash})
 }
