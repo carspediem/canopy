@@ -23,10 +23,10 @@ const (
 // ─── State key prefixes (must not collide with base plugin: 1, 2, 7) ──────────
 
 var (
-	measurementPrefix = []byte{10} // keyed by uint64 ID
-	contributorPrefix = []byte{11} // keyed by address bytes
-	networkStatsKey   = []byte{12} // single global entry
-	seqKey            = []byte{13} // monotonic measurement counter
+	measurementPrefix  = []byte{10} // keyed by uint64 ID
+	contributorPrefix  = []byte{11} // keyed by address bytes
+	networkStatsPrefix = []byte{12} // singleton — must be JoinLenPrefix'd
+	seqPrefix          = []byte{13} // singleton — must be JoinLenPrefix'd
 )
 
 // ─── On-chain state types ──────────────────────────────────────────────────────
@@ -76,13 +76,15 @@ func KeyForContributor(addr []byte) []byte {
 }
 
 // KeyForNetworkStats returns the store key for the singleton NetworkStats entry.
+// Uses JoinLenPrefix so the canopy store's DecodeLengthPrefixed doesn't panic.
 func KeyForNetworkStats() []byte {
-	return networkStatsKey
+	return JoinLenPrefix(networkStatsPrefix, []byte{0})
 }
 
 // KeyForSeq returns the store key for the measurement sequence counter.
+// Uses JoinLenPrefix so the canopy store's DecodeLengthPrefixed doesn't panic.
 func KeyForSeq() []byte {
-	return seqKey
+	return JoinLenPrefix(seqPrefix, []byte{0})
 }
 
 // ─── JSON marshal helpers ──────────────────────────────────────────────────────
